@@ -27,42 +27,42 @@ const getDirVersions = (dirPath) => {
   });
 };
 
-// Function to copy directories with versioning
-const copyDir = (dirPath) => {
-  const relativePath = path.relative(SOURCE_DIR, dirPath);
-  const destDir = path.join(DESTINATION_DIR, path.dirname(relativePath));
-  fs.ensureDirSync(destDir);
-
+// Function to create a backup of the directory
+const backupDirectory = (dirPath) => {
+  const dirName = path.basename(dirPath);
   const versions = getDirVersions(dirPath);
   const newVersion = versions.length > 0 ? parseInt(versions[0].split('_v')[1]) + 1 : 1;
-  const destPath = path.join(destDir, getVersionedDirName(path.basename(dirPath), newVersion));
+  const versionedDirName = getVersionedDirName(dirName, newVersion);
+  const destinationPath = path.join(DESTINATION_DIR, versionedDirName);
 
-  fs.copy(dirPath, destPath)
-    .then(() => {
-      console.log(`Copied: ${dirPath} to ${destPath}`);
-      // Remove old versions if exceeding MAX_VERSIONS
-      if (versions.length >= MAX_VERSIONS) {
-        const oldVersions = versions.slice(MAX_VERSIONS - 1);
-        oldVersions.forEach(oldVersion => {
-          fs.removeSync(path.join(destDir, oldVersion));
-          console.log(`Removed old version: ${oldVersion}`);
-        });
-      }
-    })
-    .catch(err => console.error(`Error copying ${dirPath}:`, err));
+  fs.copySync(dirPath, destinationPath);
+  console.log(`Backup created: ${destinationPath}`);
+
+  // Remove old versions if exceeding MAX_VERSIONS
+  if (versions.length >= MAX_VERSIONS) {
+    const oldVersion = versions[versions.length - 1];
+    const oldVersionPath = path.join(DESTINATION_DIR, oldVersion);
+    fs.removeSync(oldVersionPath);
+    console.log(`Old version removed: ${oldVersionPath}`);
+  }
 };
 
 // Initialize watcher
-const watcher = chokidar.watch(SOURCE_DIR, {
-  persistent: true,
-  ignoreInitial: true,
-  depth: 0, // Watch only the top-level directories
-});
+const watcher = chokidar.watch(SOURCE_DIR, { persistent: true, ignoreInitial: true, depth: 0 });
 
-// Add event listeners
+// Event listeners
 watcher
-  .on('addDir', copyDir)
-  .on('changeDir', copyDir)
-  .on('error', error => console.error(`Watcher error: ${error}`));
+  .on('addDir', (dirPath) => {
+    console.log(`Directory added: ${dirPath}`);
+    backupDirectory(dirPath);
+  })
+  .on('change', (filePath) => {
+    const dirPath = path.dirname(filePath);
+    console.log(`File changed: ${filePath}`);
+    backupDirectory(dirPath);
+  })
+  .on('unlinkDir', (dirPath) => {
+    console.log(`Directory removed: ${dirPath}`);
+  });
 
 console.log(`Watching for changes in ${SOURCE_DIR}`);
