@@ -5,7 +5,7 @@ const path = require('path');
 
 const SOURCE_DIR = process.env.SOURCE_DIR;
 const DESTINATION_DIR = process.env.DESTINATION_DIR;
-const MAX_VERSIONS = 4;
+const MAX_VERSIONS = 8;
 
 // Ensure destination directory exists
 fs.ensureDirSync(DESTINATION_DIR);
@@ -18,7 +18,7 @@ const getVersionedDirName = (dirPath, version) => {
 // Function to get all versions of a directory
 const getDirVersions = (dirPath) => {
   const baseName = path.basename(dirPath);
-  const parentDir = path.dirname(path.join(DESTINATION_DIR, dirPath));
+  const parentDir = path.dirname(path.join(DESTINATION_DIR, baseName));
   const dirs = fs.readdirSync(parentDir).filter(dir => dir.startsWith(baseName) && dir.includes('_v'));
   return dirs.sort((a, b) => {
     const versionA = parseInt(a.split('_v')[1]);
@@ -47,8 +47,10 @@ const backupDirectory = (dirPath) => {
   }
 };
 
+// TODO: if multiple files updated in a folder - causes multiple events and backups.
+//       Not critical but a fix candidate.
 // Initialize watcher
-const watcher = chokidar.watch(SOURCE_DIR, { persistent: true, ignoreInitial: true, depth: 0 });
+const watcher = chokidar.watch(SOURCE_DIR, { persistent: true, ignoreInitial: true, depth: 1 });
 
 // Event listeners
 watcher
