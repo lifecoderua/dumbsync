@@ -5,7 +5,10 @@ const path = require('path');
 
 const SOURCE_DIR = process.env.SOURCE_DIR;
 const DESTINATION_DIR = process.env.DESTINATION_DIR;
-const MAX_VERSIONS = 8;
+const MAX_VERSIONS = 4;
+// backup debounce delay, prevents multiple copies 
+// and exceptions on file being removed in process of the external directory update
+const DEBOUNCE_DELAY = 1000;
 
 // Ensure destination directory exists
 fs.ensureDirSync(DESTINATION_DIR);
@@ -47,8 +50,18 @@ const backupDirectory = (dirPath) => {
   }
 };
 
-// TODO: if multiple files updated in a folder - causes multiple events and backups.
-//       Not critical but a fix candidate.
+// Debounce function
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
+
+// Debounced version of backupDirectory
+const debouncedBackupDirectory = debounce(backupDirectory, DEBOUNCE_DELAY);
+
 // Initialize watcher
 const watcher = chokidar.watch(SOURCE_DIR, { persistent: true, ignoreInitial: true, depth: 1 });
 
@@ -56,12 +69,12 @@ const watcher = chokidar.watch(SOURCE_DIR, { persistent: true, ignoreInitial: tr
 watcher
   .on('addDir', (dirPath) => {
     console.log(`Directory added: ${dirPath}`);
-    backupDirectory(dirPath);
+    debouncedBackupDirectory(dirPath);
   })
   .on('change', (filePath) => {
     const dirPath = path.dirname(filePath);
     console.log(`File changed: ${filePath}`);
-    backupDirectory(dirPath);
+    debouncedBackupDirectory(dirPath);
   })
   .on('unlinkDir', (dirPath) => {
     console.log(`Directory removed: ${dirPath}`);
